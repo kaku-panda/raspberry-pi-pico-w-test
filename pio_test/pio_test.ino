@@ -15,6 +15,8 @@
 #error pio/pwm example requires a board with a regular LED
 #endif
 
+#define LED_PIN 0
+
 // Write `period` to the input shift register
 void pio_pwm_set_period(PIO pio, uint sm, uint32_t period) {
   pio_sm_set_enabled(pio, sm, false);
@@ -39,8 +41,9 @@ void setup() {
   // todo get free sm
   sm = 0;
   offset = pio_add_program(pio, &pwm_program);
-
-  pwm_program_init(pio, sm, offset, PICO_DEFAULT_LED_PIN);
+  // gpio_init(LED_PIN);
+  // gpio_set_dir(LED_PIN, GPIO_OUT);
+  pwm_program_init(pio, sm, offset, LED_PIN);
   pio_pwm_set_period(pio, sm, (1u << 16) - 1);
   sleep_ms(300);  // has to sleep for more than 300ms until Serial print begins to works
   Serial.begin(115200);
@@ -53,5 +56,5 @@ void loop() {
   Serial.printf("Level = %d\n", level);
   pio_pwm_set_level(pio, sm, level * level);
   level = (level + 1) % 256;
-  sleep_ms(10);
+  // sleep_ms(10);
 }
