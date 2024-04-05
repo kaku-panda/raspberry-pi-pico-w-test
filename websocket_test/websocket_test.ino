@@ -10,7 +10,8 @@
 #error pio/pwm example requires a board with a regular LED
 #endif
 
-#define LED_PIN 0
+#define LED_PIN_0 0
+#define LED_PIN_1 1
 
 const char* ssid = "PicoW";
 const char* password = "12345678";
@@ -39,19 +40,23 @@ void pio_pwm_set_level(PIO pio, uint sm, uint32_t level) {
 }
 
 PIO pio = pio0;
-uint offset;
-int sm;
-int level = 0;
 
+uint offset;
+int sm_0;
+int sm_1;
+int level_0 = 0;
+int level_1 = 0;
 
 void setup() {
   // todo get free sm
-  sm = 0;
+  sm_0 = 0;
+  sm_1 = 1;
   offset = pio_add_program(pio, &pwm_program);
-  // gpio_init(LED_PIN);
-  // gpio_set_dir(LED_PIN, GPIO_OUT);
-  pwm_program_init(pio, sm, offset, LED_PIN);
-  pio_pwm_set_period(pio, sm, (1u << 16) - 1);
+
+  pwm_program_init(pio, sm_0, offset, LED_PIN_0);
+  pwm_program_init(pio, sm_1, offset, LED_PIN_1);
+  pio_pwm_set_period(pio, sm_0, (1u << 16) - 1);
+  pio_pwm_set_period(pio, sm_1, (1u << 16) - 1);
   sleep_ms(300);  // has to sleep for more than 300ms until Serial print begins to works
   Serial.begin(115200);
   Serial.printf("Loaded program at %d\n", offset);
@@ -66,14 +71,15 @@ void setup() {
 
   // WebSocketサーバーを開始
   webSocket.begin();
-  webSocket.onEvent(webSocketEvent);
+webSocket.onEvent(webSocketEvent);    
 
   Serial.println("WebSocket server started.");
 }
 
 void loop() {
   webSocket.loop();
-  pio_pwm_set_level(pio, sm, level * level);
+  pio_pwm_set_level(pio, sm_0, level_0 * level_0);
+  pio_pwm_set_level(pio, sm_1, level_1 * level_1);
 }
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
@@ -97,8 +103,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
       else if (text == "green off") green = 0;
       else if (text == "blue off")  blue  = 0;
       else if(text.startsWith("accel ")) {
-        int value = text.substring(4).toInt(); // "accel "の後ろの数値を取得
-        level = value & 0xFF;                  // 下位8ビットを取得
+        int value = text.substring(6).toInt(); // "accel "の後ろの数値を取得
+        level_0 = value & 0xFF;                // 下位8ビットを取得
+        level_1 = (value >> 8) & 0xFF;         // 上位8ビットを取得
       }
       break;
   }
