@@ -1,0 +1,7 @@
+; Read Sonsor
+
+.program read_sensors
+
+; 事前に設定された6つのピンからデータを読み込む
+    in pins, 6    ; 6ビットデータを読み込み(OSRに格納)
+    push block    ; 読み込んだデータをFIFOにプッシュ
