@@ -139,7 +139,7 @@ void setup() {
 
   sleep_ms(1000);
 
-  
+
 
   // Serial
   Serial.begin(115200);
@@ -157,14 +157,14 @@ void setup() {
   Serial.println("WebSocket server started.");
 }
 
-void loop() {
+void loop1() {
   pio_pwm_set_level(pio_0, pio_0_sm_0, leftMotorAccelForward   * leftMotorAccelForward);
   pio_pwm_set_level(pio_0, pio_0_sm_1, rightMotorAccelForward  * rightMotorAccelForward);
   pio_pwm_set_level(pio_0, pio_0_sm_2, leftMotorAccelBackward  * leftMotorAccelBackward);
   pio_pwm_set_level(pio_0, pio_0_sm_3, rightMotorAccelBackward * rightMotorAccelBackward);
 }
 
-void loop1() {
+void loop() {
   webSocket.loop();
 }
 
