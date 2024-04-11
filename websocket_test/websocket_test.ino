@@ -190,6 +190,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
       Serial.printf("[%u] Connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
       webSocket.sendTXT(num, "Welcome to the WebSocket server!");
       break;
+    
     }
     case WStype_TEXT:
       String text = String((char *)payload).substring(0, length);
