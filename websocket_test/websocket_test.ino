@@ -169,6 +169,7 @@ void loop() {
 }
 
 
+
 void decodeAccel(String str) {
   String hex_0 = str.substring(6, 8);
   String hex_1 = str.substring(8, 10);
