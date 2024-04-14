@@ -12,17 +12,17 @@
 #error pio/pwm example requires a board with a regular LED
 #endif
 
-#define LED_PIN_0 0
-#define LED_PIN_1 1
-#define LED_PIN_2 2
-#define LED_PIN_3 3
+#define LED_PIN_0 12
+#define LED_PIN_1 13
+#define LED_PIN_2 14
+#define LED_PIN_3 15
 
-#define SENSOR_PIN_0 12
-#define SENSOR_PIN_1 13
-#define SENSOR_PIN_2 14
-#define SENSOR_PIN_3 15
-#define SENSOR_PIN_4 8
-#define SENSOR_PIN_5 9
+// #define SENSOR_PIN_0 12
+// #define SENSOR_PIN_1 13
+// #define SENSOR_PIN_2 14
+// #define SENSOR_PIN_3 15
+// #define SENSOR_PIN_4 8
+// #define SENSOR_PIN_5 9
 
 #define TEST_PIN_0 16
 #define TEST_PIN_1 17
@@ -88,11 +88,21 @@ void setup() {
   gpio_init(TEST_PIN_2);
   gpio_init(TEST_PIN_3);
 
+  // GPIOピンを出力として初期化
+  gpio_init(LED_PIN_0);
+  gpio_init(LED_PIN_1);
+  gpio_init(LED_PIN_2);
+  gpio_init(LED_PIN_3);
+
   // GPIOピンを出力モードに設定
   gpio_set_dir(TEST_PIN_0, GPIO_OUT);
   gpio_set_dir(TEST_PIN_1, GPIO_OUT);
   gpio_set_dir(TEST_PIN_2, GPIO_OUT);
   gpio_set_dir(TEST_PIN_3, GPIO_OUT);
+  gpio_set_dir(LED_PIN_0, GPIO_OUT);
+  gpio_set_dir(LED_PIN_1, GPIO_OUT);
+  gpio_set_dir(LED_PIN_2, GPIO_OUT);
+  gpio_set_dir(LED_PIN_3, GPIO_OUT);
 
   // GPIOピンに高電圧を出力してONにする
   gpio_put(TEST_PIN_0, 1);
@@ -157,18 +167,16 @@ void setup() {
   Serial.println("WebSocket server started.");
 }
 
-void loop1() {
+void loop() {
   pio_pwm_set_level(pio_0, pio_0_sm_0, leftMotorAccelForward   * leftMotorAccelForward);
   pio_pwm_set_level(pio_0, pio_0_sm_1, rightMotorAccelForward  * rightMotorAccelForward);
   pio_pwm_set_level(pio_0, pio_0_sm_2, leftMotorAccelBackward  * leftMotorAccelBackward);
   pio_pwm_set_level(pio_0, pio_0_sm_3, rightMotorAccelBackward * rightMotorAccelBackward);
 }
 
-void loop() {
+void loop1() {
   webSocket.loop();
 }
-
-
 
 void decodeAccel(String str) {
   String hex_0 = str.substring(6, 8);
