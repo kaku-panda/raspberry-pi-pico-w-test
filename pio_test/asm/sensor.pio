@@ -1,7 +1,15 @@
-; Read Sonsor
-
 .program read_sensors
 
-; 事前に設定された6つのピンからデータを読み込む
-    in pins, 6    ; 6ビットデータを読み込み(OSRに格納)
-    push block    ; 読み込んだデータをFIFOにプッシュ
+; GPIO0からGPIO5までのデータを読み取り、それをFIFOに格納するためのプログラム
+; 入力ピンの設定を確認して、これらのピンが正しく設定されていることを保証する
+
+.side_set 1 optional    ; サイドセットをオプショナルとして使用
+
+; プログラムの開始地点
+start:
+    in pins, 1          ; GPIO0からGPIO5までの6ビットを読み込む
+    push                ; ブロックモードでFIFOにプッシュする（FIFOが満杯の場合は待機）
+    jmp start           ; 無限ループを形成し、継続してデータを読み取る
+
+.wrap_target
+.wrap
