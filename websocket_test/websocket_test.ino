@@ -5,31 +5,29 @@
 #include "hardware/pio.h"
 #include "hardware/dma.h"
 #include "pwm.pio.h"
+#include "sensor2motor.h"
 #include "sensor.pio.h"
 #include <string.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #ifndef PICO_DEFAULT_LED_PIN
 #error pio/pwm example requires a board with a regular LED
 #endif
 
-#define LED_PIN_0 12
-#define LED_PIN_1 13
-#define LED_PIN_2 14
-#define LED_PIN_3 15
+#define MOTOR_PIN_0 12
+#define MOTOR_PIN_1 13
+#define MOTOR_PIN_2 14
+#define MOTOR_PIN_3 15
 
-#define SENSOR_PIN_0 0
-#define SENSOR_PIN_1 1
-#define SENSOR_PIN_2 2
-#define SENSOR_PIN_3 3
-#define SENSOR_PIN_4 4
-#define SENSOR_PIN_5 5
-
-#define TEST_PIN_0 6
-#define TEST_PIN_1 7
-#define TEST_PIN_2 8
-#define TEST_PIN_3 9
-#define TEST_PIN_4 10
-#define TEST_PIN_5 11
+#define SENSOR_PIN_0 26
+#define SENSOR_PIN_1 22
+#define SENSOR_PIN_2 21
+#define SENSOR_PIN_3 20
+#define SENSOR_PIN_4 19
+#define SENSOR_PIN_5 18
+#define SENSOR_PIN_6 17
+#define SENSOR_PIN_7 16
 
 const char* ssid = "PicoW";
 const char* password = "12345678";
@@ -60,7 +58,6 @@ unsigned int readLatestDataFromFifo(PIO pio, uint sm) {
   while (!pio_sm_is_rx_fifo_empty(pio, sm)) {
     latestData = pio_sm_get(pio, sm);
     Serial.println("wait");
-    Serial.println(gpio_get(TEST_PIN_0));
   }
   Serial.println(latestData);
   return latestData;
@@ -81,8 +78,10 @@ static unsigned int leftMotorAccelForward   = 0;
 static unsigned int leftMotorAccelBackward  = 0;
 static unsigned int rightMotorAccelForward  = 0;
 static unsigned int rightMotorAccelBackward = 0;
-static unsigned int sensorReg    = 0;
-static unsigned int oldSensorReg = 0;
+
+float Kp = 0.12;
+float Ki = 0;
+float Kd = 5.0;
 
 int dma_chan_0;
 int dma_chan_1;
@@ -96,49 +95,33 @@ void setup() {
   gpio_init(SENSOR_PIN_3);
   gpio_init(SENSOR_PIN_4);
   gpio_init(SENSOR_PIN_5);
-  gpio_init(TEST_PIN_0);
-  gpio_init(TEST_PIN_1);
-  gpio_init(TEST_PIN_2);
-  gpio_init(TEST_PIN_3);
-  gpio_init(TEST_PIN_4);
-  gpio_init(TEST_PIN_5);
-  gpio_init(LED_PIN_0);
-  gpio_init(LED_PIN_1);
-  gpio_init(LED_PIN_2);
-  gpio_init(LED_PIN_3);
+  gpio_init(SENSOR_PIN_6);
+  gpio_init(SENSOR_PIN_7);
+  gpio_init(MOTOR_PIN_0);
+  gpio_init(MOTOR_PIN_1);
+  gpio_init(MOTOR_PIN_2);
+  gpio_init(MOTOR_PIN_3);
+
   gpio_set_dir(SENSOR_PIN_0, GPIO_IN);
   gpio_set_dir(SENSOR_PIN_1, GPIO_IN);
   gpio_set_dir(SENSOR_PIN_2, GPIO_IN);
   gpio_set_dir(SENSOR_PIN_3, GPIO_IN);
   gpio_set_dir(SENSOR_PIN_4, GPIO_IN);
   gpio_set_dir(SENSOR_PIN_5, GPIO_IN);
-  gpio_set_dir(TEST_PIN_0, GPIO_OUT);
-  gpio_set_dir(TEST_PIN_1, GPIO_OUT);
-  gpio_set_dir(TEST_PIN_2, GPIO_OUT);
-  gpio_set_dir(TEST_PIN_3, GPIO_OUT);
-  gpio_set_dir(TEST_PIN_4, GPIO_OUT);
-  gpio_set_dir(TEST_PIN_5, GPIO_OUT);
-  gpio_set_dir(LED_PIN_0, GPIO_OUT);
-  gpio_set_dir(LED_PIN_1, GPIO_OUT);
-  gpio_set_dir(LED_PIN_2, GPIO_OUT);
-  gpio_set_dir(LED_PIN_3, GPIO_OUT);
+  gpio_set_dir(SENSOR_PIN_6, GPIO_IN);
+  gpio_set_dir(SENSOR_PIN_7, GPIO_IN);
 
-
-
-  // GPIOピンをHIGHに設定
-  gpio_put(TEST_PIN_0, 1);
-  gpio_put(TEST_PIN_1, 1);
-  gpio_put(TEST_PIN_2, 1);
-  gpio_put(TEST_PIN_3, 1);
-  gpio_put(TEST_PIN_4, 1);
-  gpio_put(TEST_PIN_5, 1);
+  gpio_set_dir(MOTOR_PIN_0, GPIO_OUT);
+  gpio_set_dir(MOTOR_PIN_1, GPIO_OUT);
+  gpio_set_dir(MOTOR_PIN_2, GPIO_OUT);
+  gpio_set_dir(MOTOR_PIN_3, GPIO_OUT);
 
   // PWM
   pio_0_offset = pio_add_program(pio_0, &pwm_program);
-  pwm_program_init(pio_0, pio_0_sm_0, pio_0_offset, LED_PIN_0);
-  pwm_program_init(pio_0, pio_0_sm_1, pio_0_offset, LED_PIN_1);
-  pwm_program_init(pio_0, pio_0_sm_2, pio_0_offset, LED_PIN_2);
-  pwm_program_init(pio_0, pio_0_sm_3, pio_0_offset, LED_PIN_3);
+  pwm_program_init(pio_0, pio_0_sm_0, pio_0_offset, MOTOR_PIN_0);
+  pwm_program_init(pio_0, pio_0_sm_1, pio_0_offset, MOTOR_PIN_1);
+  pwm_program_init(pio_0, pio_0_sm_2, pio_0_offset, MOTOR_PIN_2);
+  pwm_program_init(pio_0, pio_0_sm_3, pio_0_offset, MOTOR_PIN_3);
   pio_pwm_set_period(pio_0, pio_0_sm_0, (1u << 16) - 1);
   pio_pwm_set_period(pio_0, pio_0_sm_1, (1u << 16) - 1);
   pio_pwm_set_period(pio_0, pio_0_sm_2, (1u << 16) - 1);
@@ -146,13 +129,12 @@ void setup() {
   Serial.printf("Loaded program at %d\n", pio_0_offset);
 
   // Sensor
-  pio_1_offset    = pio_add_program(pio_1, &read_sensors_program);
-  pio_sm_config c = pio_get_default_sm_config();
-  sm_config_set_in_pins(&c, SENSOR_PIN_0);
-  // sm_config_set_sideset_pins(&c, 0);
-  pio_sm_init(pio_1, pio_1_sm_0, pio_1_offset, &c);
-  pio_sm_set_enabled(pio_1, pio_1_sm_0, true);
-  Serial.printf("Loaded program at %d\n", pio_1_offset);
+  // pio_1_offset    = pio_add_program(pio_1, &read_sensors_program);
+  // pio_sm_config c = pio_get_default_sm_config();
+  // sm_config_set_in_pins(&c, SENSOR_PIN_0);
+  // pio_sm_init(pio_1, pio_1_sm_0, pio_1_offset, &c);
+  // pio_sm_set_enabled(pio_1, pio_1_sm_0, true);
+  // Serial.printf("Loaded program at %d\n", pio_1_offset);
   
   // DMA
   // dma_chan_0 = dma_claim_unused_channel(true);
@@ -188,15 +170,24 @@ void setup() {
   webSocket.onEvent(webSocketEvent);    
 
   Serial.println("WebSocket server started.");
+
+  setup_motor_accel_values();
 }
 
 void loop() {
+  char sensor = gpio_get(SENSOR_PIN_0) << 7 |  gpio_get(SENSOR_PIN_1) << 6 | gpio_get(SENSOR_PIN_2) << 5 | gpio_get(SENSOR_PIN_3) << 4 | gpio_get(SENSOR_PIN_4) << 3 | gpio_get(SENSOR_PIN_5) << 2 | gpio_get(SENSOR_PIN_6) << 1 | gpio_get(SENSOR_PIN_7) << 0;
+  uint32_t accel = control_motors(sensor, Kp, Ki, Kd);
+  // Serial.println(Kp);
+  
+  leftMotorAccelForward   = (accel >> 24) & 0xFF; 
+  leftMotorAccelBackward  = (accel >> 16) & 0xFF;
+  rightMotorAccelForward  = (accel >> 8) & 0xFF;
+  rightMotorAccelBackward = (accel >> 0) & 0xFF;
+
   pio_pwm_set_level(pio_0, pio_0_sm_0, leftMotorAccelForward   * leftMotorAccelForward);
-  pio_pwm_set_level(pio_0, pio_0_sm_1, rightMotorAccelForward  * rightMotorAccelForward);
-  pio_pwm_set_level(pio_0, pio_0_sm_2, leftMotorAccelBackward  * leftMotorAccelBackward);
+  pio_pwm_set_level(pio_0, pio_0_sm_1, leftMotorAccelBackward  * leftMotorAccelBackward);
+  pio_pwm_set_level(pio_0, pio_0_sm_2, rightMotorAccelForward  * rightMotorAccelForward);
   pio_pwm_set_level(pio_0, pio_0_sm_3, rightMotorAccelBackward * rightMotorAccelBackward);
-  // Serial.println(readLatestDataFromFifo(pio_1, pio_1_sm_0));
-  readLatestDataFromFifo(pio_1, pio_1_sm_0);
 }
 
 void loop1() {
@@ -218,6 +209,44 @@ void decodeAccel(String accel_string) {
   rightMotorAccelForward  = strtoul(accel_hex_1.c_str(), NULL, 16);
   leftMotorAccelBackward  = strtoul(accel_hex_2.c_str(), NULL, 16);
   rightMotorAccelBackward = strtoul(accel_hex_3.c_str(), NULL, 16);
+}
+
+void extractAndConvertFloatKp(String text) {
+    // "PID:kp:" と ";" の間の文字列を取得
+    int startIndex = text.indexOf("PID:kp:") + 7;  // "PID:kp:" の次の文字から開始
+    int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
+
+    if (startIndex > 0 && endIndex > startIndex) {
+        String numberStr = text.substring(startIndex, endIndex);
+        Kp = numberStr.toFloat();
+    } else {
+        Serial.println("Error: Invalid format");
+    }
+}
+
+void extractAndConvertFloatKi(String text) {
+    // "PID:kp:" と ";" の間の文字列を取得
+    int startIndex = text.indexOf("PID:ki:") + 7;  // "PID:kp:" の次の文字から開始
+    int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
+
+    if (startIndex > 0 && endIndex > startIndex) {
+        String numberStr = text.substring(startIndex, endIndex);
+        Ki = numberStr.toFloat();
+    } else {
+        Serial.println("Error: Invalid format");
+    }
+}
+void extractAndConvertFloatKd(String text) {
+    // "PID:kp:" と ";" の間の文字列を取得
+    int startIndex = text.indexOf("PID:kd:") + 7;  // "PID:kp:" の次の文字から開始
+    int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
+
+    if (startIndex > 0 && endIndex > startIndex) {
+        String numberStr = text.substring(startIndex, endIndex);
+        Kd = numberStr.toFloat();
+    } else {
+        Serial.println("Error: Invalid format");
+    }
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -245,6 +274,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
       Serial.printf("[%u] Text: %s\n", num, text.c_str()); 
       if(text.startsWith("accel ")) {
         decodeAccel(text);
+      }
+      if(text.startsWith("PID:kp:")){
+        extractAndConvertFloatKp(text);
+      }
+      if(text.startsWith("PID:ki:")){
+        extractAndConvertFloatKi(text);
+      }
+      if(text.startsWith("PID:kd:")){
+        extractAndConvertFloatKd(text);
       }
       break;
   }
