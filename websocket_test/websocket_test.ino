@@ -79,9 +79,14 @@ static unsigned int leftMotorAccelBackward  = 0;
 static unsigned int rightMotorAccelForward  = 0;
 static unsigned int rightMotorAccelBackward = 0;
 
-float Kp = 0.12;
+float speed = 0.5;
+float Kp = 0.045;
 float Ki = 0;
-float Kd = 5.0;
+float Kd = 0;
+
+char sensor, sensor_prev;
+
+bool active = false;
 
 int dma_chan_0;
 int dma_chan_1;
@@ -170,24 +175,41 @@ void setup() {
   webSocket.onEvent(webSocketEvent);    
 
   Serial.println("WebSocket server started.");
-
-  setup_motor_accel_values();
 }
+unsigned long lastTime = 0;
 
 void loop() {
-  char sensor = gpio_get(SENSOR_PIN_0) << 7 |  gpio_get(SENSOR_PIN_1) << 6 | gpio_get(SENSOR_PIN_2) << 5 | gpio_get(SENSOR_PIN_3) << 4 | gpio_get(SENSOR_PIN_4) << 3 | gpio_get(SENSOR_PIN_5) << 2 | gpio_get(SENSOR_PIN_6) << 1 | gpio_get(SENSOR_PIN_7) << 0;
-  uint32_t accel = control_motors(sensor, Kp, Ki, Kd);
-  // Serial.println(Kp);
-  
-  leftMotorAccelForward   = (accel >> 24) & 0xFF; 
-  leftMotorAccelBackward  = (accel >> 16) & 0xFF;
-  rightMotorAccelForward  = (accel >> 8) & 0xFF;
-  rightMotorAccelBackward = (accel >> 0) & 0xFF;
+  if (active){
+    
+    unsigned long currentTime = millis();
+    float deltaT = (currentTime - lastTime) / 1000.0;
 
-  pio_pwm_set_level(pio_0, pio_0_sm_0, leftMotorAccelForward   * leftMotorAccelForward);
-  pio_pwm_set_level(pio_0, pio_0_sm_1, leftMotorAccelBackward  * leftMotorAccelBackward);
-  pio_pwm_set_level(pio_0, pio_0_sm_2, rightMotorAccelForward  * rightMotorAccelForward);
-  pio_pwm_set_level(pio_0, pio_0_sm_3, rightMotorAccelBackward * rightMotorAccelBackward);
+    sensor = gpio_get(SENSOR_PIN_0) << 7 |  gpio_get(SENSOR_PIN_1) << 6 | gpio_get(SENSOR_PIN_2) << 5 | gpio_get(SENSOR_PIN_3) << 4 | gpio_get(SENSOR_PIN_4) << 3 | gpio_get(SENSOR_PIN_5) << 2 | gpio_get(SENSOR_PIN_6) << 1 | gpio_get(SENSOR_PIN_7) << 0;
+
+    Serial.println(sensor, HEX);
+
+
+    if (sensor == 0){
+      sensor = sensor_prev;
+    }
+
+    uint32_t accel = control_motors(sensor, speed, Kp, Ki, Kd, deltaT);
+
+    // Serial.println(accel, HEX);
+    
+    leftMotorAccelForward   = (accel >> 24) & 0xFF; 
+    leftMotorAccelBackward  = (accel >> 16) & 0xFF;
+    rightMotorAccelForward  = (accel >> 8)  & 0xFF;
+    rightMotorAccelBackward = (accel >> 0)  & 0xFF;
+
+    pio_pwm_set_level(pio_0, pio_0_sm_0, leftMotorAccelForward   * leftMotorAccelForward);
+    pio_pwm_set_level(pio_0, pio_0_sm_1, leftMotorAccelBackward  * leftMotorAccelBackward);
+    pio_pwm_set_level(pio_0, pio_0_sm_2, rightMotorAccelForward  * rightMotorAccelForward);
+    pio_pwm_set_level(pio_0, pio_0_sm_3, rightMotorAccelBackward * rightMotorAccelBackward);
+
+    sensor_prev = sensor;
+    lastTime = currentTime;
+  }
 }
 
 void loop1() {
@@ -211,8 +233,19 @@ void decodeAccel(String accel_string) {
   rightMotorAccelBackward = strtoul(accel_hex_3.c_str(), NULL, 16);
 }
 
+void extractAndConvertFloatSpeed(String text) {
+    int startIndex = text.indexOf("PID:speed:") + 10;  // "PID:kp:" の次の文字から開始
+    int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
+
+    if (startIndex > 0 && endIndex > startIndex) {
+        String numberStr = text.substring(startIndex, endIndex);
+        speed = numberStr.toFloat();
+    } else {
+        Serial.println("Error: Invalid format");
+    }
+}
+
 void extractAndConvertFloatKp(String text) {
-    // "PID:kp:" と ";" の間の文字列を取得
     int startIndex = text.indexOf("PID:kp:") + 7;  // "PID:kp:" の次の文字から開始
     int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
 
@@ -225,7 +258,6 @@ void extractAndConvertFloatKp(String text) {
 }
 
 void extractAndConvertFloatKi(String text) {
-    // "PID:kp:" と ";" の間の文字列を取得
     int startIndex = text.indexOf("PID:ki:") + 7;  // "PID:kp:" の次の文字から開始
     int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
 
@@ -237,7 +269,6 @@ void extractAndConvertFloatKi(String text) {
     }
 }
 void extractAndConvertFloatKd(String text) {
-    // "PID:kp:" と ";" の間の文字列を取得
     int startIndex = text.indexOf("PID:kd:") + 7;  // "PID:kp:" の次の文字から開始
     int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
 
@@ -271,7 +302,23 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
     }
     case WStype_TEXT:
       String text = String((char *)payload).substring(0, length);
-      Serial.printf("[%u] Text: %s\n", num, text.c_str()); 
+      Serial.printf("[%u] Text: %s\n", num, text.c_str());
+      if(text.startsWith("start")) {
+        active = true;
+        init_pid();
+      }
+      if(text.startsWith("stop")) {
+        active = false;
+        leftMotorAccelForward   = 0;
+        leftMotorAccelBackward  = 0;
+        rightMotorAccelForward  = 0;
+        rightMotorAccelBackward = 0;
+        pio_pwm_set_level(pio_0, pio_0_sm_0, leftMotorAccelForward   * leftMotorAccelForward);
+        pio_pwm_set_level(pio_0, pio_0_sm_1, leftMotorAccelBackward  * leftMotorAccelBackward);
+        pio_pwm_set_level(pio_0, pio_0_sm_2, rightMotorAccelForward  * rightMotorAccelForward);
+        pio_pwm_set_level(pio_0, pio_0_sm_3, rightMotorAccelBackward * rightMotorAccelBackward);
+        init_pid();
+      }
       if(text.startsWith("accel ")) {
         decodeAccel(text);
       }
@@ -283,6 +330,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
       }
       if(text.startsWith("PID:kd:")){
         extractAndConvertFloatKd(text);
+      }
+      if(text.startsWith("PID:speed:")){
+        extractAndConvertFloatSpeed(text);
       }
       break;
   }
