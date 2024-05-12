@@ -83,6 +83,7 @@ float speed = 0.5;
 float Kp = 0.045;
 float Ki = 0;
 float Kd = 0;
+int   sensorWeight[8] = {0, 0, 0, 0, 0 ,0, 0, 0};
 
 char sensor, sensor_prev;
 
@@ -193,7 +194,7 @@ void loop() {
       sensor = sensor_prev;
     }
 
-    uint32_t accel = control_motors(sensor, speed, Kp, Ki, Kd, deltaT);
+    uint32_t accel = control_motors(sensor, &sensorWeight, speed, Kp, Ki, Kd, deltaT);
 
     // Serial.println(accel, HEX);
     
@@ -234,7 +235,7 @@ void decodeAccel(String accel_string) {
 }
 
 void extractAndConvertFloatSpeed(String text) {
-    int startIndex = text.indexOf("PID:speed:") + 10;  // "PID:kp:" の次の文字から開始
+    int startIndex = text.indexOf("Speed:") + 6;  // "PID:kp:" の次の文字から開始
     int endIndex = text.indexOf(';', startIndex);  // ";" が出現する位置を検索
 
     if (startIndex > 0 && endIndex > startIndex) {
@@ -275,6 +276,21 @@ void extractAndConvertFloatKd(String text) {
     if (startIndex > 0 && endIndex > startIndex) {
         String numberStr = text.substring(startIndex, endIndex);
         Kd = numberStr.toFloat();
+    } else {
+        Serial.println("Error: Invalid format");
+    }
+}
+
+void extractAndConvertSensor(String text) {
+    int startIndex   = text.indexOf("Sensor:sensor") + 13;  // "PID:kp:" の次の文字から開始
+    String numberStr = text.substring(startIndex, startIndex + 1);
+    int sensorIndex  = numberStr.toInt();
+    startIndex       = startIndex + 2;
+    int endIndex     = text.indexOf(';', startIndex);         // ";" が出現する位置を検索
+
+    if (startIndex > 0 && endIndex > startIndex) {
+        numberStr = text.substring(startIndex, endIndex);
+        sensorWeight[sensorIndex] = numberStr.toInt();
     } else {
         Serial.println("Error: Invalid format");
     }
@@ -331,8 +347,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
       if(text.startsWith("PID:kd:")){
         extractAndConvertFloatKd(text);
       }
-      if(text.startsWith("PID:speed:")){
+      if(text.startsWith("Speed:")){
         extractAndConvertFloatSpeed(text);
+      }
+      if(text.startsWith("Sensor")){
+        extractAndConvertSensor(text);
       }
       break;
   }

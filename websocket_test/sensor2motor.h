@@ -18,9 +18,7 @@ int clip_value(int value) {
 #define LINE_MIDDLE 0
 #define MAX_SPEED   255
 
-const int sensor_weight[8] = {-4, -3, -2, -1, 1, 2, 3, 4};
-
-float get_average_line_position(uint8_t sensor_value){
+float get_average_line_position(uint8_t sensor_value, int8_t* sensor_weight){
     int length = 0;
     int sum    = 0;
     for(int n = 0; n < 8; n++){
@@ -48,9 +46,9 @@ void init_pid() {
 	last_error = 0.0;
 }
 
-uint32_t control_motors(uint8_t sensor_value, float speed, float Kp, float Ki, float Kd, float deltaT) {
+uint32_t control_motors(uint8_t sensor_value, int8_t* sensor_weight, float speed, float Kp, float Ki, float Kd, float deltaT) {
 
-    float position = get_average_line_position(sensor_value);
+    float position = get_average_line_position(sensor_value, sensor_weight);
     
 	error[0]  = error[1];
 	error[1]  = -position;
